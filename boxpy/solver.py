@@ -7,9 +7,9 @@ from boxpy.interpolation import interpolate_coarsen_2
 
 def boxmg_symmetric_solver(grid,
                            max_levels=None,
-                           min_size=3,
-                           presmoother='jacobi',
-                           postsmoother='jacobi'):
+                           min_size=5,
+                           presmoother=('jacobi', {'iterations': 2}),
+                           postsmoother=('jacobi', {'iterations': 2})):
     levels = []
     current_grid = grid
 

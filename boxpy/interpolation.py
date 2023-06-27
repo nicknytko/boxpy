@@ -35,6 +35,18 @@ def interpolate_coarsen_2(grid):
         return (x >= 0 and x < grid.shape[0] and
                 y >= 0 and y < grid.shape[1])
 
+    # Coarse-points
+    for x in range(0, grid.shape[0], 2):
+        for y in range(0, grid.shape[1], 2):
+            stencil = grid[x, y]
+            row = fine_pos_to_idx(x, y)
+
+            xc, yc = fine_to_coarse_pos(x, y)
+            col = coarse_pos_to_idx(xc, yc)
+
+            P[row, col] = 1.0 # interpolate exactly with identity
+
+
     # Horizontal gamma-points (embedded on x-lines)
     for x in range(1, grid.shape[0], 2):
         for y in range(0, grid.shape[1], 2):
@@ -94,7 +106,7 @@ def interpolate_coarsen_2(grid):
                 P[row] += v/c * P[fine_pos_to_idx(x + x_rel, y + y_rel)]
             else:
                 # Otherwise, interpolate from the coarse point.
-                P[row, col] = v/c
+                P[row, col] += v/c
 
     # Iota-points
     for x in range(1, grid.shape[0], 2):
