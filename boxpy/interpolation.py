@@ -19,7 +19,7 @@ def interpolate_coarsen_2(grid):
 
     # A few helpers
     def fine_to_coarse_pos(x, y):
-        return ((x-1)//2, (y-1)//2)
+        return (x//2, y//2)
 
     def coarse_pos_to_idx(xc, yc):
         return yc * coarse_shape[0] + xc
@@ -34,6 +34,22 @@ def interpolate_coarsen_2(grid):
     def fine_pt_in_bounds(x, y):
         return (x >= 0 and x < grid.shape[0] and
                 y >= 0 and y < grid.shape[1])
+
+    '''
+    Overview of the coarse grid:
+    - c points are subsets of the fine grid that are copied directly.
+    - gamma points are embedded horizontally or vertically between two c points.
+    - iota points are not grid aligned to a c point and interpolate between
+    neighboring c and gamma points (including diagonally)
+
+    c--γ--c ...
+    |\ | /|
+    γ--ι--γ
+    |/ | \|
+    c--γ--c ...
+
+    \\vdots
+    '''
 
     # Coarse-points
     for x in range(0, grid.shape[0], 2):
