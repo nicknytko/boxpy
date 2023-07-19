@@ -1,15 +1,16 @@
 import numpy as np
 import scipy.sparse as sp
-import enum
 import boxpy.grid
 
 
 def interpolate_coarsen_2(grid):
     if grid.ndim != 2:
-        raise NotImplementedError('Coarsening by two only implemented for 2D problems.')
+        raise NotImplementedError('Coarsening by two only implemented ' +
+                                  'for 2D problems.')
 
     if grid.bc != boxpy.grid.BoundaryCondition.DIRICHLET:
-        raise NotImplementedError('Coarsening by two only implemented for Dirichlet boundary conditions.')
+        raise NotImplementedError('Coarsening by two only implemented ' +
+                                  'for Dirichlet boundary conditions.')
 
     # Define the coarse grid
     coarse_shape = tuple((dim + 1) // 2 for dim in grid.shape)
@@ -38,15 +39,15 @@ def interpolate_coarsen_2(grid):
     '''
     Overview of the coarse grid:
     - c points are subsets of the fine grid that are copied directly.
-    - gamma points are embedded horizontally or vertically between two c points.
+    - gamma points are embedded horizontally or vertically between two cpts.
     - iota points are not grid aligned to a c point and interpolate between
     neighboring c and gamma points (including diagonally)
 
     c--γ--c ...
-    |\ | /|
+    |\ | /|                                                        # noqa: W605
     γ--ι--γ
     |/ | \|
-    c--γ--c ...
+    c--γ--c ...                                                    # noqa: W605
 
     \\vdots
     '''
@@ -60,8 +61,7 @@ def interpolate_coarsen_2(grid):
             xc, yc = fine_to_coarse_pos(x, y)
             col = coarse_pos_to_idx(xc, yc)
 
-            P[row, col] = 1.0 # interpolate exactly with identity
-
+            P[row, col] = 1.0  # interpolate exactly with identity
 
     # Horizontal gamma-points (embedded on x-lines)
     for x in range(1, grid.shape[0], 2):
@@ -69,22 +69,22 @@ def interpolate_coarsen_2(grid):
             stencil = grid[x, y]
             row = fine_pos_to_idx(x, y)
 
-            l = -(stencil[-1, 1] + stencil[-1, 0] + stencil[-1, -1])
-            r = -(stencil[1, 1] + stencil[1, 0] + stencil[1, -1])
-            c = stencil[0, 0] + stencil[0, -1] + stencil[0, 1]
+            left = -(stencil[-1, 1] + stencil[-1, 0] + stencil[-1, -1])
+            right = -(stencil[1, 1] + stencil[1, 0] + stencil[1, -1])
+            center = stencil[0, 0] + stencil[0, -1] + stencil[0, 1]
 
-            if c == 0:
-                c = 1.
+            if center == 0:
+                center = 1.
 
             l_xc, l_yc = fine_to_coarse_pos(x-1, y)
             r_xc, r_yc = fine_to_coarse_pos(x+1, y)
 
             if coarse_pt_in_bounds(l_xc, l_yc):
                 l_col = coarse_pos_to_idx(l_xc, l_yc)
-                P[row, l_col] = l / c
+                P[row, l_col] = left / center
             if coarse_pt_in_bounds(r_xc, r_yc):
                 r_col = coarse_pos_to_idx(r_xc, r_yc)
-                P[row, r_col] = r / c
+                P[row, r_col] = right / center
 
     # Vertical gamma-points (embedded on y-lines)
     for x in range(0, grid.shape[0], 2):
@@ -116,9 +116,10 @@ def interpolate_coarsen_2(grid):
             col = coarse_pos_to_idx(xc, yc)
             v = -stencil[x_rel, y_rel]
 
-            if ((x_rel == 0 or y_rel == 0) and
-                fine_pt_in_bounds(x + x_rel, y+y_rel)): # N/S/E/W point
-                # Interpolating from a gamma point.  Copy the row from the matrix.
+            if ((x_rel == 0 or y_rel == 0) and           # N/S/E/W point
+                fine_pt_in_bounds(x + x_rel, y+y_rel)):  # noqa: E129 (shut up)
+                # Interpolating from a gamma point.
+                # Copy the row from the matrix.
                 P[row] += v/c * P[fine_pos_to_idx(x + x_rel, y + y_rel)]
             else:
                 # Otherwise, interpolate from the coarse point.
@@ -135,13 +136,13 @@ def interpolate_coarsen_2(grid):
             if c == 0:
                 c = 1.
 
-            iota_try_set(x, y, -1, -1, c, stencil, row) # SW
-            iota_try_set(x, y,  0, -1, c, stencil, row) # S
-            iota_try_set(x, y,  1, -1, c, stencil, row) # SE
-            iota_try_set(x, y, -1,  0, c, stencil, row) # W
-            iota_try_set(x, y,  1,  0, c, stencil, row) # E
-            iota_try_set(x, y, -1,  1, c, stencil, row) # NW
-            iota_try_set(x, y,  0,  1, c, stencil, row) # N
-            iota_try_set(x, y,  1,  1, c, stencil, row) # NE
+            iota_try_set(x, y, -1, -1, c, stencil, row)  # SW
+            iota_try_set(x, y,  0, -1, c, stencil, row)  # S
+            iota_try_set(x, y,  1, -1, c, stencil, row)  # SE
+            iota_try_set(x, y, -1,  0, c, stencil, row)  # W
+            iota_try_set(x, y,  1,  0, c, stencil, row)  # E
+            iota_try_set(x, y, -1,  1, c, stencil, row)  # NW
+            iota_try_set(x, y,  0,  1, c, stencil, row)  # N
+            iota_try_set(x, y,  1,  1, c, stencil, row)  # NE
 
     return P, coarse_shape

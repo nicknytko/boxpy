@@ -21,8 +21,10 @@ class Grid:
         dx = 1./(Nx + 1)
         dy = 1./(Ny + 1)
 
-        Ax = nu * (1./dx**2) * (sp.eye(Nx) * 2 - sp.eye(Nx, k=-1) - sp.eye(Nx, k=1))
-        Ay = nu * (1./dy**2) * (sp.eye(Ny) * 2 - sp.eye(Ny, k=-1) - sp.eye(Ny, k=1))
+        Ax = (nu * (1./dx**2) *
+              (sp.eye(Nx) * 2 - sp.eye(Nx, k=-1) - sp.eye(Nx, k=1)))
+        Ay = (nu * (1./dy**2) *
+              (sp.eye(Ny) * 2 - sp.eye(Ny, k=-1) - sp.eye(Ny, k=1)))
 
         A = sp.kron(Ax, sp.eye(Ny)) + sp.kron(sp.eye(Nx), Ay)
 
@@ -50,8 +52,9 @@ class Grid:
         st[:] = stencil_val
 
     def interp_fcn(self, f):
-        xx, yy = np.meshgrid(np.linspace(self.xlim[0], self.xlim[1], self.shape[0]),
-                             np.linspace(self.ylim[0], self.ylim[1], self.shape[1]))
+        xx, yy = np.meshgrid(
+            np.linspace(self.xlim[0], self.xlim[1], self.shape[0]),
+            np.linspace(self.ylim[0], self.ylim[1], self.shape[1]))
 
         xx = xx
         yy = yy
@@ -86,10 +89,11 @@ class Stencil:
         self.pos = np.array(indices)
         self.ndim = len(self.shape)
 
-        assert(self.ndim == 2 or self.ndim == 3)
+        assert (self.ndim == 2 or self.ndim == 3)
 
         self.stencil_values = np.zeros((Stencil.WIDTH,) * self.ndim)
-        self.stencil_indices = np.zeros((Stencil.WIDTH,) * self.ndim, dtype=np.int64)
+        self.stencil_indices = np.zeros((Stencil.WIDTH,) * self.ndim,
+                                        dtype=np.int64)
 
         self.strides = np.cumprod(np.insert(np.array(self.shape), 0, 1))[:-1]
         self.stencil_numel = Stencil.WIDTH ** self.ndim
@@ -100,7 +104,7 @@ class Stencil:
                 global_idx = self._global_pos_to_idx(global_pos)
                 try:
                     v = self.grid.op[self.row_idx, global_idx]
-                except:
+                except IndexError:
                     v = 0.
                 self.stencil_values[*stencil_pos] = v
                 self.stencil_indices[*stencil_pos] = global_idx
@@ -111,15 +115,15 @@ class Stencil:
         if self.ndim == 2:
             i, j = self.pos
 
-            update_val((1, 1), (i, j)) # O
-            update_val((1, 2), (i, j + 1)) # N
-            update_val((2, 2), (i + 1, j + 1)) # NE
-            update_val((2, 1), (i + 1, j)) # E
-            update_val((2, 0), (i + 1, j - 1)) # SE
-            update_val((1, 0), (i, j - 1)) # S
-            update_val((0, 0), (i - 1, j - 1)) # SW
-            update_val((0, 1), (i - 1, j)) # W
-            update_val((0, 2), (i - 1, j + 1)) # NW
+            update_val((1, 1), (i, j))          # O
+            update_val((1, 2), (i, j + 1))      # N
+            update_val((2, 2), (i + 1, j + 1))  # NE
+            update_val((2, 1), (i + 1, j))      # E
+            update_val((2, 0), (i + 1, j - 1))  # SE
+            update_val((1, 0), (i, j - 1))      # S
+            update_val((0, 0), (i - 1, j - 1))  # SW
+            update_val((0, 1), (i - 1, j))      # W
+            update_val((0, 2), (i - 1, j + 1))  # NW
         else:
             raise NotImplementedError('3D is not implemented.')
 
