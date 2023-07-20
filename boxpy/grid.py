@@ -1,68 +1,105 @@
+"""Grid and boundary condition classes."""
+
+import enum
 import numpy as np
 import scipy.sparse as sp
-import enum
 
 
 class BoundaryCondition(enum.Enum):
-    DIRICHLET = 1,
+    """Enumerate boundary conditions."""
+
+    DIRICHLET = 1
     PERIODIC = 2
 
 
 class Grid:
-    def __init__(self, op, shape, xlim, ylim, bc):
-        self.op = op
+    """Based Grid class."""
+
+    # pylint: disable-next=too-many-arguments
+    def __init__(self, operator, shape, xlim, ylim, bc):
+        """Initialize the grid class."""
+        self.operator = operator
         self.shape = shape
         self.ndim = len(self.shape)
         self.xlim = xlim
         self.ylim = ylim
         self.bc = bc
 
-    def create_poisson_dirichlet_2d(Nx, Ny, nu):
-        dx = 1./(Nx + 1)
-        dy = 1./(Ny + 1)
+    def create_poisson_dirichlet_2d(self, nx, ny, nu):
+        """Construct a Poisson operator in 2D.
 
-        Ax = (nu * (1./dx**2) *
-              (sp.eye(Nx) * 2 - sp.eye(Nx, k=-1) - sp.eye(Nx, k=1)))
-        Ay = (nu * (1./dy**2) *
-              (sp.eye(Ny) * 2 - sp.eye(Ny, k=-1) - sp.eye(Ny, k=1)))
+        Parameters
+        ----------
+        nx : int
+            Number of grid points in x
+        nx : int
+            Number of grid points in x
+        nu : float
+            Diffusion coefficient
 
-        A = sp.kron(Ax, sp.eye(Ny)) + sp.kron(sp.eye(Nx), Ay)
+        Return
+        ------
+        Grid object
+        """
+        dx = 1./(nx + 1)
+        dy = 1./(ny + 1)
 
-        x = np.linspace(0, 1, Nx + 2)
-        y = np.linspace(0, 1, Ny + 2)
+        Ax = (nu * (1./dx**2) * (sp.eye(nx) * 2 - sp.eye(nx, k=-1) - sp.eye(nx, k=1)))
+        Ay = (nu * (1./dy**2) * (sp.eye(ny) * 2 - sp.eye(ny, k=-1) - sp.eye(ny, k=1)))
+
+        A = sp.kron(Ax, sp.eye(ny)) + sp.kron(sp.eye(nx), Ay)
+
+        x = np.linspace(0, 1, nx + 2)
+        y = np.linspace(0, 1, ny + 2)
 
         return Grid(A,
-                    shape=(Nx, Ny),
+                    shape=(nx, ny),
                     xlim=(x[1], x[-1]),
                     ylim=(y[1], y[-1]),
                     bc=BoundaryCondition.DIRICHLET)
 
     def coarsen(self, new_shape, P, R=None):
-        A_H = R @ self.op @ P
-        return Grid(A_H, new_shape, self.xlim, self.ylim, self.bc)
+        """Coarsen the operator."""
+        AH = R @ self.operator @ P
+        return Grid(AH, new_shape, self.xlim, self.ylim, self.bc)
 
     def __call__(self, *indices):
+        """Retrieve stencils."""
         return Stencil(self, *(np.array(indices) - 1))
 
     def __getitem__(self, indices):
+        """Retreive a stencil."""
         return Stencil(self, *indices)
 
     def __setitem__(self, indices, stencil_val):
-        st = Stencil(self, *indices)
-        st[:] = stencil_val
+        """Set stencils."""
+        stencil = Stencil(self, *indices)
+        stencil[:] = stencil_val
 
     def interp_fcn(self, f):
+        """Interpolate a function.
+
+        Parameters
+        ----------
+        f : function
+            Function of two parameters, x and y
+
+        Return
+        ------
+        Grid function
+            Evaluation of the function on the grid
+        """
         xx, yy = np.meshgrid(
             np.linspace(self.xlim[0], self.xlim[1], self.shape[0]),
             np.linspace(self.ylim[0], self.ylim[1], self.shape[1]))
 
-        xx = xx
-        yy = yy
         return f(xx, yy)
 
 
 class Stencil:
-    WIDTH = 3
+    """Base class of a Stencil."""
+
+    width = 3
 
     def _global_pos_to_idx(self, pos):
         return np.sum(pos * self.strides)
@@ -70,7 +107,7 @@ class Stencil:
     def _stencil_idx_to_pos(self, idx):
         indices = []
         for dim in range(self.ndim - 1, -1, -1):
-            stride = Stencil.WIDTH ** dim
+            stride = Stencil.width ** dim
             component = int(idx / stride)
             indices.append(component)
             idx -= component * stride
@@ -84,26 +121,27 @@ class Stencil:
         return True
 
     def __init__(self, grid, *indices):
+        """Initialize stencil entries."""
         self.grid = grid
         self.shape = self.grid.shape
         self.pos = np.array(indices)
         self.ndim = len(self.shape)
 
-        assert (self.ndim == 2 or self.ndim == 3)
+        assert self.ndim in (2, 3)
 
-        self.stencil_values = np.zeros((Stencil.WIDTH,) * self.ndim)
-        self.stencil_indices = np.zeros((Stencil.WIDTH,) * self.ndim,
+        self.stencil_values = np.zeros((Stencil.width,) * self.ndim)
+        self.stencil_indices = np.zeros((Stencil.width,) * self.ndim,
                                         dtype=np.int64)
 
         self.strides = np.cumprod(np.insert(np.array(self.shape), 0, 1))[:-1]
-        self.stencil_numel = Stencil.WIDTH ** self.ndim
+        self.stencil_numel = Stencil.width ** self.ndim
         self.row_idx = self._global_pos_to_idx(self.pos)
 
         def update_val(stencil_pos, global_pos):
             if self._idx_in_bounds(global_pos):
                 global_idx = self._global_pos_to_idx(global_pos)
                 try:
-                    v = self.grid.op[self.row_idx, global_idx]
+                    v = self.grid.operator[self.row_idx, global_idx]
                 except IndexError:
                     v = 0.
                 self.stencil_values[*stencil_pos] = v
@@ -128,16 +166,19 @@ class Stencil:
             raise NotImplementedError('3D is not implemented.')
 
     def __getitem__(self, key):
+        """Return entries of a stencil."""
         assert isinstance(key, tuple)
         new_key = np.array(key) + 1
         return self.stencil_values[*new_key]
 
     def __setitem__(self, key, val):
+        """Set entries of a stencil."""
         assert isinstance(key, tuple)
         new_key = np.array(key) + 1
-        self.grid.op[self.row_idx, self.stencil_indices[*new_key]] = val
+        self.grid.operator[self.row_idx, self.stencil_indices[*new_key]] = val
 
     def __repr__(self):
+        """Return representation of stencil."""
         out = np.zeros((3, 3))
         for x in range(-1, 2):
             for y in range(-1, 2):
