@@ -1,8 +1,9 @@
+"""Solve Poisson."""
 import numpy as np
 import numpy.linalg as la
+import matplotlib.pyplot as plt
 import boxpy
 import boxpy.interpolation
-import matplotlib.pyplot as plt
 
 N = 64
 
@@ -30,7 +31,8 @@ ax.set_xlabel('Multigrid Iteration')
 ax.set_ylabel('Absolute Residual')
 
 ax2 = ax.twinx()
-convline = ax2.plot(np.arange(1, len(res)), conv, '--', color='tab:orange', label='Convergence')
+convline = ax2.plot(np.arange(1, len(res)), conv,
+                    linestyle='--', color='tab:orange', label='Convergence')
 ax2.set_ylabel('Convergence Factor')
 
 lines = resline + convline

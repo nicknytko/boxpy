@@ -1,7 +1,8 @@
+"""Show images of BoxMG solutions."""
 import numpy as np
+import matplotlib.pyplot as plt
 import boxpy
 import boxpy.interpolation
-import matplotlib.pyplot as plt
 
 N = 64
 

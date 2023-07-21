@@ -1,3 +1,4 @@
+"""BoxMG solver."""
 import numpy as np
 import pyamg
 import pyamg.multilevel
@@ -10,6 +11,26 @@ def boxmg_symmetric_solver(grid,
                            min_size=5,
                            presmoother=('jacobi', {'iterations': 2}),
                            postsmoother=('jacobi', {'iterations': 2})):
+    """Blacbox Multigrid (BoxMG) Symmetric Solver.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid object
+    max_levels : int
+        Maximum number of levels
+    min_size : int
+        Minimum size for a level
+    presmoother : string, tuple
+        Presmoother details
+    postsmoother : string, tuple
+        Postsmoother details
+
+    Returns
+    -------
+    ml
+        Multilevel object
+    """
     levels = []
     current_grid = grid
 
