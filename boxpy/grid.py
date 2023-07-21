@@ -144,11 +144,11 @@ class Stencil:
                     v = self.grid.operator[self.row_idx, global_idx]
                 except IndexError:
                     v = 0.
-                self.stencil_values[*stencil_pos] = v
-                self.stencil_indices[*stencil_pos] = global_idx
+                self.stencil_values[stencil_pos] = v
+                self.stencil_indices[stencil_pos] = global_idx
             else:
-                self.stencil_values[*stencil_pos] = 0.
-                self.stencil_indices[*stencil_pos] = -1
+                self.stencil_values[stencil_pos] = 0.
+                self.stencil_indices[stencil_pos] = -1
 
         if self.ndim == 2:
             i, j = self.pos
@@ -169,13 +169,13 @@ class Stencil:
         """Return entries of a stencil."""
         assert isinstance(key, tuple)
         new_key = np.array(key) + 1
-        return self.stencil_values[*new_key]
+        return self.stencil_values[new_key]
 
     def __setitem__(self, key, val):
         """Set entries of a stencil."""
         assert isinstance(key, tuple)
         new_key = np.array(key) + 1
-        self.grid.operator[self.row_idx, self.stencil_indices[*new_key]] = val
+        self.grid.operator[self.row_idx, self.stencil_indices[new_key]] = val
 
     def __repr__(self):
         """Return representation of stencil."""
