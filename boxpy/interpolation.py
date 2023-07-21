@@ -1,9 +1,32 @@
+"""BoxMG Interpolation."""
 import numpy as np
 import scipy.sparse as sp
 import boxpy.grid
 
 
 def interpolate_coarsen_2(grid):
+    r"""Interpolate and coarsen.
+
+    Parameters
+    ----------
+    grid : Grid
+        Grid object
+
+    Notes
+    -----
+    Overview of the coarse grid:
+    - c points are subsets of the fine grid that are copied directly.
+    - gamma points are embedded horizontally or vertically between two c points.
+    - iota points are not grid aligned to a c point and interpolate between
+    neighboring c and gamma points (including diagonally)
+
+    c---γ---c
+    | \ | / |
+    γ---ι---γ
+    | / | \ |
+    c---γ---c
+
+    """
     if grid.ndim != 2:
         raise NotImplementedError('Coarsening by two only implemented ' +
                                   'for 2D problems.')
@@ -14,9 +37,9 @@ def interpolate_coarsen_2(grid):
 
     # Define the coarse grid
     coarse_shape = tuple((dim + 1) // 2 for dim in grid.shape)
-    coarse_N = np.prod(coarse_shape)
-    grid_N = np.prod(grid.shape)
-    P = sp.lil_matrix((grid_N, coarse_N))
+    n_coarse = np.prod(coarse_shape)
+    grid_coarse = np.prod(grid.shape)
+    P = sp.lil_matrix((grid_coarse, n_coarse))
 
     # A few helpers
     def fine_to_coarse_pos(x, y):
@@ -29,28 +52,12 @@ def interpolate_coarsen_2(grid):
         return y * grid.shape[0] + x
 
     def coarse_pt_in_bounds(xc, yc):
-        return (xc >= 0 and xc < coarse_shape[0] and
-                yc >= 0 and yc < coarse_shape[1])
+        return (0 <= xc < coarse_shape[0] and
+                0 <= yc < coarse_shape[1])
 
     def fine_pt_in_bounds(x, y):
-        return (x >= 0 and x < grid.shape[0] and
-                y >= 0 and y < grid.shape[1])
-
-    '''
-    Overview of the coarse grid:
-    - c points are subsets of the fine grid that are copied directly.
-    - gamma points are embedded horizontally or vertically between two cpts.
-    - iota points are not grid aligned to a c point and interpolate between
-    neighboring c and gamma points (including diagonally)
-
-    c--γ--c ...
-    |\ | /|                                                        # noqa: W605
-    γ--ι--γ
-    |/ | \|
-    c--γ--c ...                                                    # noqa: W605
-
-    \\vdots
-    '''
+        return (0 <= x < grid.shape[0] and
+                0 <= y < grid.shape[1])
 
     # Coarse-points
     for x in range(0, grid.shape[0], 2):
