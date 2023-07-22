@@ -7,7 +7,7 @@ import boxpy.interpolation
 
 N = 64
 
-grid = boxpy.Grid.create_poisson_dirichlet_2d(N, N, 1.0)
+grid = boxpy.grid.create_poisson_dirichlet_2d(N, N, 1.0)
 ml = boxpy.boxmg_symmetric_solver(grid)
 
 print(ml)
