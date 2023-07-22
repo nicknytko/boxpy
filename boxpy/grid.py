@@ -25,39 +25,6 @@ class Grid:
         self.ylim = ylim
         self.bc = bc
 
-    def create_poisson_dirichlet_2d(self, nx, ny, nu):
-        """Construct a Poisson operator in 2D.
-
-        Parameters
-        ----------
-        nx : int
-            Number of grid points in x
-        nx : int
-            Number of grid points in x
-        nu : float
-            Diffusion coefficient
-
-        Return
-        ------
-        Grid object
-        """
-        dx = 1./(nx + 1)
-        dy = 1./(ny + 1)
-
-        Ax = (nu * (1./dx**2) * (sp.eye(nx) * 2 - sp.eye(nx, k=-1) - sp.eye(nx, k=1)))
-        Ay = (nu * (1./dy**2) * (sp.eye(ny) * 2 - sp.eye(ny, k=-1) - sp.eye(ny, k=1)))
-
-        A = sp.kron(Ax, sp.eye(ny)) + sp.kron(sp.eye(nx), Ay)
-
-        x = np.linspace(0, 1, nx + 2)
-        y = np.linspace(0, 1, ny + 2)
-
-        return Grid(A,
-                    shape=(nx, ny),
-                    xlim=(x[1], x[-1]),
-                    ylim=(y[1], y[-1]),
-                    bc=BoundaryCondition.DIRICHLET)
-
     def coarsen(self, new_shape, P, R=None):
         """Coarsen the operator."""
         AH = R @ self.operator @ P
@@ -94,6 +61,40 @@ class Grid:
             np.linspace(self.ylim[0], self.ylim[1], self.shape[1]))
 
         return f(xx, yy)
+
+
+def create_poisson_dirichlet_2d(nx, ny, nu):
+    """Construct a Poisson operator in 2D.
+
+    Parameters
+    ----------
+    nx : int
+        Number of grid points in x
+    nx : int
+        Number of grid points in x
+    nu : float
+        Diffusion coefficient
+
+    Return
+    ------
+    Grid object
+    """
+    dx = 1./(nx + 1)
+    dy = 1./(ny + 1)
+
+    Ax = (nu * (1./dx**2) * (sp.eye(nx) * 2 - sp.eye(nx, k=-1) - sp.eye(nx, k=1)))
+    Ay = (nu * (1./dy**2) * (sp.eye(ny) * 2 - sp.eye(ny, k=-1) - sp.eye(ny, k=1)))
+
+    A = sp.kron(Ax, sp.eye(ny)) + sp.kron(sp.eye(nx), Ay)
+
+    x = np.linspace(0, 1, nx + 2)
+    y = np.linspace(0, 1, ny + 2)
+
+    return Grid(A,
+                shape=(nx, ny),
+                xlim=(x[1], x[-1]),
+                ylim=(y[1], y[-1]),
+                bc=BoundaryCondition.DIRICHLET)
 
 
 class Stencil:
