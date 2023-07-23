@@ -16,7 +16,7 @@ def _convert_to_csr(P_v, P_j):
     indices = np.empty(max_nnz, dtype=np.int64)
     data = np.empty(max_nnz, dtype=np.float64)
 
-    for row in range(len(P_v)):
+    for row in range(len(P_v)):  # pylint: disable=consider-using-enumerate
         rowptr[row] = ptr
 
         # Combine duplicate entries
@@ -26,14 +26,14 @@ def _convert_to_csr(P_v, P_j):
         row_v = P_v[row]
         row_j = P_j[row]
 
-        for row_i in range(len(col_argsort)):
+        for row_i, idx in enumerate(col_argsort):
             idx = col_argsort[row_i]
 
             col = row_j[idx]
             v_current += row_v[idx]
 
             if ((row_i == len(col_argsort) - 1) or
-                (row_j[idx] != row_j[col_argsort[row_i + 1]])):
+                    (row_j[idx] != row_j[col_argsort[row_i + 1]])):
                 data[ptr] = v_current
                 indices[ptr] = col
                 v_current = 0
@@ -184,8 +184,8 @@ def interpolate_coarsen_2(grid):
             v = -stencil[x_rel, y_rel]
 
             if ((x_rel == 0 or y_rel == 0) and           # N/S/E/W point
-                fine_pt_in_bounds(x + x_rel, y+y_rel)):  # noqa: E129 (shut up)
-                # Interpolating from a gamma point.
+                    fine_pt_in_bounds(x + x_rel, y+y_rel)):
+                # Interpolating from a gamma point:
                 # Copy the existing row from the matrix.
                 add_scaled_row(row, fine_pos_to_idx(x + x_rel, y + y_rel), v / c)
             else:

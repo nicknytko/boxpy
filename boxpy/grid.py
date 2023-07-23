@@ -65,6 +65,7 @@ class Grid:
 
 def create_poisson_dirichlet_2d(nx, ny, nu):
     """Construct a Poisson operator in 2D.
+
     Dirichlet boundary conditions are assumed, and boundary nodes are removed
     from the returned operator.
 
@@ -78,7 +79,7 @@ def create_poisson_dirichlet_2d(nx, ny, nu):
         Diffusion coefficient
 
     Returns
-    ------
+    -------
     Grid object
     """
     dx = 1./(nx + 1)
@@ -171,7 +172,7 @@ class Stencil:
     def __getitem__(self, key):
         """Return entries of a stencil."""
         assert isinstance(key, tuple)
-        new_key = np.array(key) + 1 # Shift indices into corrcet range
+        new_key = np.array(key) + 1  # Shift indices into corrcet range
         return self.stencil_values[tuple(new_key)]
 
     def __setitem__(self, key, val):
