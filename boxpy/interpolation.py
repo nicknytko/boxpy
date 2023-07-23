@@ -141,7 +141,7 @@ def interpolate_coarsen_2(grid):
             center = stencil[0, 0] + stencil[0, -1] + stencil[0, 1]
 
             if center == 0:
-                center = 1.
+                center = 1e-4
 
             l_xc, l_yc = fine_to_coarse_pos(x-1, y)
             r_xc, r_yc = fine_to_coarse_pos(x+1, y)
@@ -164,7 +164,7 @@ def interpolate_coarsen_2(grid):
             c = stencil[0, 0] + stencil[-1, 0] + stencil[1, 0]
 
             if c == 0:
-                c = 1.
+                c = 1e-4
 
             t_xc, t_yc = fine_to_coarse_pos(x, y+1)
             b_xc, b_yc = fine_to_coarse_pos(x, y-1)
@@ -201,7 +201,7 @@ def interpolate_coarsen_2(grid):
 
             c = stencil[0, 0]
             if c == 0:
-                c = 1.
+                c = 1e-4
 
             iota_try_set(x, y, -1, -1, c, stencil, row)  # SW
             iota_try_set(x, y,  1, -1, c, stencil, row)  # SE

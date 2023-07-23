@@ -1,27 +1,35 @@
-"""Solve Poisson."""
+"""Solve the recirculating flow problem from
+Finite Elements and Fast Iterative Solvers.
+
+
+"""
 import numpy as np
 import numpy.linalg as la
+import scipy.sparse.linalg as spla
 import matplotlib.pyplot as plt
 import boxpy
 import boxpy.interpolation
-import cProfile
-import sys
 
-N = 64
+N = 128
 
-grid, _ = boxpy.grid.create_poisson_dirichlet_2d(N, N, 1.0)
+def bc(x, y):
+    return (x == 1).astype(np.float64)
 
-if '--profile' in sys.argv:
-    cProfile.runctx('ml = boxpy.boxmg_symmetric_solver(grid)',
-                    globals(), locals(), sort='cumtime')
-else:
-    ml = boxpy.boxmg_symmetric_solver(grid)
+def v(x, y):
+    x = x * 2 - 1
+    y = y * 2 - 1
+    return np.column_stack((
+        2. * y * (1 - x ** 2),
+        -2 * x * (1 - y ** 2)
+    ))
+
+grid, b = boxpy.grid.create_advection_dirichlet_2d(N, N, 1/200, v, bc)
+ml = boxpy.boxmg_solver(grid)
 
 print(ml)
 
 x0 = grid.interp_fcn(lambda x, y: np.random.normal(size=x.shape)).flatten()
 x0 = x0 / la.norm(x0)
-b = grid.interp_fcn(lambda x, y: np.zeros_like(x)).flatten()
 
 res = []
 x = ml.solve(b, x0, residuals=res)
@@ -46,4 +54,10 @@ lines = resline + convline
 ax2.legend(lines, [line.get_label() for line in lines], loc=0)
 
 fig.suptitle('BoxMG Residual History')
+
+plt.figure()
+plt.imshow(x.reshape((N, N))[::-1,:])
+plt.colorbar()
+plt.title('Solution')
+
 plt.show()
