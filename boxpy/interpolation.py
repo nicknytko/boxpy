@@ -86,6 +86,7 @@ def interpolate_coarsen_2(grid):
 
     # Construct interpolation with a row-wise lists of elements
     # P_v[i] has nonzeros for the i'th row, and P_j[i] has column pointers for the i'th row
+    # duplicate entries are allowed, and these are summed together upon conversion to CSR
     P_v = [None] * grid_coarse
     P_j = [None] * grid_coarse
 
@@ -159,22 +160,22 @@ def interpolate_coarsen_2(grid):
             stencil = grid[x, y]
             row = fine_pos_to_idx(x, y)
 
-            t = -(stencil[-1, 1] + stencil[0, 1] + stencil[1, 1])
-            b = -(stencil[-1, -1] + stencil[0, -1] + stencil[1, -1])
-            c = stencil[0, 0] + stencil[-1, 0] + stencil[1, 0]
+            top = -(stencil[-1, 1] + stencil[0, 1] + stencil[1, 1])
+            bottom = -(stencil[-1, -1] + stencil[0, -1] + stencil[1, -1])
+            center = stencil[0, 0] + stencil[-1, 0] + stencil[1, 0]
 
-            if c == 0:
-                c = 1e-4
+            if center == 0:
+                center = 1e-4
 
             t_xc, t_yc = fine_to_coarse_pos(x, y+1)
             b_xc, b_yc = fine_to_coarse_pos(x, y-1)
 
             if coarse_pt_in_bounds(t_xc, t_yc):
                 t_col = coarse_pos_to_idx(t_xc, t_yc)
-                add_entry(row, t_col, t / c)
+                add_entry(row, t_col, top / center)
             if coarse_pt_in_bounds(b_xc, b_yc):
                 b_col = coarse_pos_to_idx(b_xc, b_yc)
-                add_entry(row, b_col, b / c)
+                add_entry(row, b_col, bottom / center)
 
     def iota_try_set(x, y, x_rel, y_rel, c, stencil, row):
         xc, yc = fine_to_coarse_pos(x + x_rel, y + y_rel)

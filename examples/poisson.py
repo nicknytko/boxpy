@@ -15,7 +15,7 @@ if '--profile' in sys.argv:
     cProfile.runctx('ml = boxpy.boxmg_symmetric_solver(grid)',
                     globals(), locals(), sort='cumtime')
 else:
-    ml = boxpy.boxmg_symmetric_solver(grid)
+    ml = boxpy.boxmg_solver(grid)
 
 print(ml)
 

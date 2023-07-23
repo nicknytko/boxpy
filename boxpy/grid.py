@@ -108,7 +108,7 @@ def _eval_bc(A, nx, ny, bc):
 
         return R@A@R.T, -R@(A_bc@bc_eval.flatten())
     else:
-        return R@A@R.T, np.zeros(nx, ny)
+        return R@A@R.T, np.zeros((nx, ny))
 
 
 def create_poisson_dirichlet_2d(nx, ny, nu, bc=None):
@@ -124,7 +124,7 @@ def create_poisson_dirichlet_2d(nx, ny, nu, bc=None):
     ny : int
         Number of (interior) grid points in x
     nu : float
-        Diffusion coefficient
+        Scalar diffusion coefficient
     bc : function
         Function to evaluate at the boundary conditions,
         if None is given then homogeneous bc are assumed.
@@ -169,7 +169,7 @@ def create_advection_dirichlet_2d(nx, ny, nu, v, bc=None):
     ny : int
         Number of (interior) grid points in x
     nu : float
-        Diffusion coefficient
+        Scalar diffusion coefficient
     v : function
         Velocity function of x and y, evaluated at each grid point.
         Should return an (N, 2) array describing the velocity field.

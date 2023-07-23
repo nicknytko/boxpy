@@ -96,8 +96,18 @@ def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
     A = grid.operator
     eps = 1e-4
 
+    # Default arguments
+
     if 'coarse_solve' not in kwargs:
         kwargs['coarse_solve'] = 'pinv'
+
+    if 'max_levels' not in kwargs:
+        kwargs['max_levels'] = None
+
+    if 'min_size' not in kwargs:
+        kwargs['min_size'] = 3
+
+    # Check coarsening
 
     if coarsen_by not in (2, 3):
         raise RuntimeError(f'Unknown value to coarsen by: {coarsen_by}.')
@@ -127,9 +137,9 @@ def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
             kwargs['postsmoother'] = default_smoother
 
         return _create_multilevel_solver(grid,
+                                         **kwargs,
                                          interpolation=sym_interpolate,
-                                         restriction=sym_restrict,
-                                         **kwargs)
+                                         restriction=sym_restrict)
     else:
         # Nonsymmetric problem:
         # Form P from 1/2(A + A^T)  and R from A^T
@@ -150,6 +160,6 @@ def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
             kwargs['postsmoother'] = default_smoother
 
         return _create_multilevel_solver(grid,
+                                         **kwargs,
                                          interpolation=nonsym_interpolate,
-                                         restriction=nonsym_restrict,
-                                         **kwargs)
+                                         restriction=nonsym_restrict)

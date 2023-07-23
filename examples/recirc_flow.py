@@ -12,6 +12,8 @@ import boxpy.interpolation
 
 N = 64
 
+# Define problem
+
 def bc(x, y):
     return (x == 1).astype(np.float64)
 
@@ -23,10 +25,13 @@ def v(x, y):
         -2 * x * (1 - y ** 2)
     ))
 
-grid, b = boxpy.grid.create_advection_dirichlet_2d(N, N, 1/200, v, bc)
-ml = boxpy.boxmg_solver(grid, max_levels=2)
+eps = 0.1
+grid, b = boxpy.grid.create_advection_dirichlet_2d(N, N, eps, v, bc)
+ml = boxpy.boxmg_solver(grid)
 
 print(ml)
+
+# Solve
 
 x0 = grid.interp_fcn(lambda x, y: np.random.normal(size=x.shape)).flatten()
 x0 = x0 / la.norm(x0)
@@ -35,11 +40,11 @@ res = []
 x = ml.solve(b, x0, residuals=res)
 res = np.array(res)
 
-conv = res[1:] / res[:-1]
+# Plot convergence history
 
+conv = res[1:] / res[:-1]
 fig = plt.figure()
 ax = plt.gca()
-
 resline = ax.semilogy(res / la.norm(b), 'o-', markersize=3, label='Residual')
 ax.grid()
 ax.set_xlabel('Multigrid Iteration')
@@ -54,6 +59,8 @@ lines = resline + convline
 ax2.legend(lines, [line.get_label() for line in lines], loc=0)
 
 fig.suptitle('BoxMG Residual History')
+
+# Plot solution
 
 plt.figure()
 plt.imshow(x.reshape((N, N))[::-1,:])
