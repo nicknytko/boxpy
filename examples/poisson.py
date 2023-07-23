@@ -4,11 +4,18 @@ import numpy.linalg as la
 import matplotlib.pyplot as plt
 import boxpy
 import boxpy.interpolation
+import cProfile
+import sys
 
 N = 64
 
 grid = boxpy.grid.create_poisson_dirichlet_2d(N, N, 1.0)
-ml = boxpy.boxmg_symmetric_solver(grid)
+
+if '--profile' in sys.argv:
+    cProfile.runctx('ml = boxpy.boxmg_symmetric_solver(grid)',
+                    globals(), locals(), sort='cumtime')
+else:
+    ml = boxpy.boxmg_symmetric_solver(grid)
 
 print(ml)
 

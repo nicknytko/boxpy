@@ -35,7 +35,7 @@ class Grid:
         return Stencil(self, *(np.array(indices) - 1))
 
     def __getitem__(self, indices):
-        """Retreive a stencil."""
+        """Retrieve a stencil."""
         return Stencil(self, *indices)
 
     def __setitem__(self, indices, stencil_val):
@@ -44,7 +44,7 @@ class Grid:
         stencil[:] = stencil_val
 
     def interp_fcn(self, f):
-        """Interpolate a function.
+        """Interpolate a function on the grid.
 
         Parameters
         ----------
@@ -65,6 +65,8 @@ class Grid:
 
 def create_poisson_dirichlet_2d(nx, ny, nu):
     """Construct a Poisson operator in 2D.
+    Dirichlet boundary conditions are assumed, and boundary nodes are removed
+    from the returned operator.
 
     Parameters
     ----------
@@ -75,7 +77,7 @@ def create_poisson_dirichlet_2d(nx, ny, nu):
     nu : float
         Diffusion coefficient
 
-    Return
+    Returns
     ------
     Grid object
     """
@@ -169,8 +171,8 @@ class Stencil:
     def __getitem__(self, key):
         """Return entries of a stencil."""
         assert isinstance(key, tuple)
-        new_key = np.array(key) + 1
-        return self.stencil_values[new_key]
+        new_key = np.array(key) + 1 # Shift indices into corrcet range
+        return self.stencil_values[tuple(new_key)]
 
     def __setitem__(self, key, val):
         """Set entries of a stencil."""

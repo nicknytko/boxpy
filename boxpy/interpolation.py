@@ -4,6 +4,50 @@ import scipy.sparse as sp
 import boxpy.grid
 
 
+def _convert_to_csr(P_v, P_j):
+    ptr = 0
+    max_nnz = 0
+
+    # Determine maximum nonzeros in the output
+    for row in P_j:
+        max_nnz += len(row)
+
+    rowptr = np.empty(len(P_v) + 1, dtype=np.int64)
+    indices = np.empty(max_nnz, dtype=np.int64)
+    data = np.empty(max_nnz, dtype=np.float64)
+
+    for row in range(len(P_v)):
+        rowptr[row] = ptr
+
+        # Combine duplicate entries
+        col_argsort = np.argsort(P_j[row])
+        v_current = 0
+
+        row_v = P_v[row]
+        row_j = P_j[row]
+
+        for row_i in range(len(col_argsort)):
+            idx = col_argsort[row_i]
+
+            col = row_j[idx]
+            v_current += row_v[idx]
+
+            if ((row_i == len(col_argsort) - 1) or
+                (row_j[idx] != row_j[col_argsort[row_i + 1]])):
+                data[ptr] = v_current
+                indices[ptr] = col
+                v_current = 0
+                ptr += 1
+
+    nnz = ptr
+    rowptr[len(P_v)] = nnz
+
+    data.resize(nnz)
+    indices.resize(nnz)
+
+    return (data, indices, rowptr)
+
+
 def interpolate_coarsen_2(grid):
     r"""Interpolate and coarsen.
 
@@ -39,7 +83,11 @@ def interpolate_coarsen_2(grid):
     coarse_shape = tuple((dim + 1) // 2 for dim in grid.shape)
     n_coarse = np.prod(coarse_shape)
     grid_coarse = np.prod(grid.shape)
-    P = sp.lil_matrix((grid_coarse, n_coarse))
+
+    # Construct interpolation with a row-wise lists of elements
+    # P_v[i] has nonzeros for the i'th row, and P_j[i] has column pointers for the i'th row
+    P_v = [None] * grid_coarse
+    P_j = [None] * grid_coarse
 
     # A few helpers
     def fine_to_coarse_pos(x, y):
@@ -59,6 +107,18 @@ def interpolate_coarsen_2(grid):
         return (0 <= x < grid.shape[0] and
                 0 <= y < grid.shape[1])
 
+    def add_entry(i, j, v):
+        if P_v[i] is None:
+            P_v[i] = []
+            P_j[i] = []
+
+        P_v[i].append(v)
+        P_j[i].append(j)
+
+    def add_scaled_row(i_to, i_from, alpha):
+        P_v[i_to].extend(np.array(P_v[i_from]) * alpha)
+        P_j[i_to].extend(P_j[i_from])
+
     # Coarse-points
     for x in range(0, grid.shape[0], 2):
         for y in range(0, grid.shape[1], 2):
@@ -68,7 +128,7 @@ def interpolate_coarsen_2(grid):
             xc, yc = fine_to_coarse_pos(x, y)
             col = coarse_pos_to_idx(xc, yc)
 
-            P[row, col] = 1.0  # interpolate exactly with identity
+            add_entry(row, col, 1.0)  # interpolate exactly with identity
 
     # Horizontal gamma-points (embedded on x-lines)
     for x in range(1, grid.shape[0], 2):
@@ -88,10 +148,10 @@ def interpolate_coarsen_2(grid):
 
             if coarse_pt_in_bounds(l_xc, l_yc):
                 l_col = coarse_pos_to_idx(l_xc, l_yc)
-                P[row, l_col] = left / center
+                add_entry(row, l_col, left / center)
             if coarse_pt_in_bounds(r_xc, r_yc):
                 r_col = coarse_pos_to_idx(r_xc, r_yc)
-                P[row, r_col] = right / center
+                add_entry(row, r_col, right / center)
 
     # Vertical gamma-points (embedded on y-lines)
     for x in range(0, grid.shape[0], 2):
@@ -111,10 +171,10 @@ def interpolate_coarsen_2(grid):
 
             if coarse_pt_in_bounds(t_xc, t_yc):
                 t_col = coarse_pos_to_idx(t_xc, t_yc)
-                P[row, t_col] = t / c
+                add_entry(row, t_col, t / c)
             if coarse_pt_in_bounds(b_xc, b_yc):
                 b_col = coarse_pos_to_idx(b_xc, b_yc)
-                P[row, b_col] = b / c
+                add_entry(row, b_col, b / c)
 
     def iota_try_set(x, y, x_rel, y_rel, c, stencil, row):
         xc, yc = fine_to_coarse_pos(x + x_rel, y + y_rel)
@@ -126,11 +186,11 @@ def interpolate_coarsen_2(grid):
             if ((x_rel == 0 or y_rel == 0) and           # N/S/E/W point
                 fine_pt_in_bounds(x + x_rel, y+y_rel)):  # noqa: E129 (shut up)
                 # Interpolating from a gamma point.
-                # Copy the row from the matrix.
-                P[row] += v/c * P[fine_pos_to_idx(x + x_rel, y + y_rel)]
+                # Copy the existing row from the matrix.
+                add_scaled_row(row, fine_pos_to_idx(x + x_rel, y + y_rel), v / c)
             else:
                 # Otherwise, interpolate from the coarse point.
-                P[row, col] += v/c
+                add_entry(row, col, v/c)
 
     # Iota-points
     for x in range(1, grid.shape[0], 2):
@@ -144,12 +204,15 @@ def interpolate_coarsen_2(grid):
                 c = 1.
 
             iota_try_set(x, y, -1, -1, c, stencil, row)  # SW
-            iota_try_set(x, y,  0, -1, c, stencil, row)  # S
             iota_try_set(x, y,  1, -1, c, stencil, row)  # SE
+            iota_try_set(x, y, -1,  1, c, stencil, row)  # NW
+            iota_try_set(x, y,  1,  1, c, stencil, row)  # NE
+
+            iota_try_set(x, y,  0, -1, c, stencil, row)  # S
             iota_try_set(x, y, -1,  0, c, stencil, row)  # W
             iota_try_set(x, y,  1,  0, c, stencil, row)  # E
-            iota_try_set(x, y, -1,  1, c, stencil, row)  # NW
             iota_try_set(x, y,  0,  1, c, stencil, row)  # N
-            iota_try_set(x, y,  1,  1, c, stencil, row)  # NE
+
+    P = sp.csr_matrix(_convert_to_csr(P_v, P_j), (grid_coarse, n_coarse))
 
     return P, coarse_shape
