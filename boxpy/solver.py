@@ -9,9 +9,9 @@ from boxpy.interpolation import interpolate_coarsen_2
 def boxmg_symmetric_solver(grid,
                            max_levels=None,
                            min_size=5,
-                           presmoother=('jacobi', {'iterations': 2}),
-                           postsmoother=('jacobi', {'iterations': 2})):
-    """Blacbox Multigrid (BoxMG) Symmetric Solver.
+                           presmoother=('gauss_seidel', {'iterations': 2}),
+                           postsmoother=('gauss_seidel', {'iterations': 2})):
+    """Blackbox Multigrid (BoxMG) Symmetric Solver.
 
     Parameters
     ----------
@@ -28,7 +28,7 @@ def boxmg_symmetric_solver(grid,
 
     Returns
     -------
-    ml
+    ml : pyamg.multilevel.MultilevelSolver
         Multilevel object
     """
     levels = []
@@ -40,7 +40,7 @@ def boxmg_symmetric_solver(grid,
         P, coarse_size = interpolate_coarsen_2(current_grid)
         R = P.T
 
-        cur_level.A = current_grid.op
+        cur_level.A = current_grid.operator
         cur_level.P = P
         cur_level.R = R
         cur_level.grid = current_grid
@@ -52,7 +52,7 @@ def boxmg_symmetric_solver(grid,
 
     # Last level (no restriction nor interpolation)
     cur_level = pyamg.multilevel.MultilevelSolver.Level()
-    cur_level.A = current_grid.op
+    cur_level.A = current_grid.operator
     cur_level.grid = current_grid
     levels.append(cur_level)
 
