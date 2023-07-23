@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import boxpy
 import boxpy.interpolation
 
-N = 128
+N = 64
 
 def bc(x, y):
     return (x == 1).astype(np.float64)
@@ -24,7 +24,7 @@ def v(x, y):
     ))
 
 grid, b = boxpy.grid.create_advection_dirichlet_2d(N, N, 1/200, v, bc)
-ml = boxpy.boxmg_solver(grid)
+ml = boxpy.boxmg_solver(grid, max_levels=2)
 
 print(ml)
 
@@ -40,10 +40,10 @@ conv = res[1:] / res[:-1]
 fig = plt.figure()
 ax = plt.gca()
 
-resline = ax.semilogy(res, 'o-', markersize=3, label='Residual')
+resline = ax.semilogy(res / la.norm(b), 'o-', markersize=3, label='Residual')
 ax.grid()
 ax.set_xlabel('Multigrid Iteration')
-ax.set_ylabel('Absolute Residual')
+ax.set_ylabel('Relative Residual')
 
 ax2 = ax.twinx()
 convline = ax2.plot(np.arange(1, len(res)), conv,

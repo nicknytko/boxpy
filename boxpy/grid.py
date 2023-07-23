@@ -27,20 +27,23 @@ class Grid:
 
     def coarsen(self, new_shape, P, R=None):
         """Coarsen the operator."""
+        if R is None:
+            R = P.T
         AH = R @ self.operator @ P
         return Grid(AH, new_shape, self.xlim, self.ylim, self.bc)
 
     def symmetrize(self):
-        """Symmetrizes a non-symmetric operator"""
+        """Symmetrizes a non-symmetric operator."""
         A_sym = (self.operator + self.operator.T)/2
         return Grid(A_sym, self.shape, self.xlim, self.ylim, self.bc)
 
     def transpose(self):
-        """Transposes a non-symmetric operator"""
+        """Transposes a non-symmetric operator."""
         return Grid(self.operator.T, self.shape, self.xlim, self.ylim, self.bc)
 
     @property
     def T(self):
+        """Transposes a non-symmetric operator."""
         return self.transpose()
 
     def __call__(self, *indices):
@@ -151,11 +154,9 @@ def create_poisson_dirichlet_2d(nx, ny, nu, bc=None):
 
 
 def create_advection_dirichlet_2d(nx, ny, nu, v, bc=None):
-    """Construct a convection-diffusion problem in 2d discretized with
-    finite-differences.
+    """Construct a convection-diffusion problem in 2d discretized with FDM.
 
     Solves the problem:
-
     div(nu * grad u) - div(vu) = 0
 
     Dirichlet boundary conditions are assumed, and boundary nodes are removed
@@ -202,8 +203,8 @@ def create_advection_dirichlet_2d(nx, ny, nu, v, bc=None):
 
     v_eval = v(xx.flatten(), yy.flatten())
 
-    C = ((sp.diags(v_eval[:,1]) @ sp.kron(Cx, sp.eye(ny + 2))) +
-         (sp.diags(v_eval[:,0]) @ sp.kron(sp.eye(nx + 2), Cy)))
+    C = ((sp.diags(v_eval[:, 1]) @ sp.kron(Cx, sp.eye(ny + 2))) +
+         (sp.diags(v_eval[:, 0]) @ sp.kron(sp.eye(nx + 2), Cy)))
 
     A, b = _eval_bc(A + C, nx, ny, bc)
 
