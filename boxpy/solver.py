@@ -3,8 +3,9 @@ import numpy as np
 import scipy.sparse.linalg as spla
 import pyamg
 import pyamg.multilevel
-from pyamg.relaxation.smoothing import change_smoothers
+from pyamg.relaxation.smoothing import change_smoothers, _unpack_arg, _setup_call
 from boxpy.interpolation import interpolate_coarsen_2
+from boxpy.smoother import setup_redblack_gauss_seidel
 
 
 def _create_multilevel_solver(grid,
@@ -46,6 +47,19 @@ def _create_multilevel_solver(grid,
     levels = []
     current_grid = grid
 
+    pre_type, pre_args = _unpack_arg(presmoother)
+    post_type, post_args = _unpack_arg(postsmoother)
+
+    if callable(pre_type):
+        setup_presmoother = pre_type
+    else:
+        setup_presmoother = _setup_call(pre_type)
+
+    if callable(post_type):
+        setup_postsmoother = post_type
+    else:
+        setup_postsmoother = _setup_call(post_type)
+
     # Recursively define levels in the hierarchy
     while np.all(np.array(current_grid.shape) >= min_size):
         cur_level = pyamg.multilevel.MultilevelSolver.Level()
@@ -56,6 +70,10 @@ def _create_multilevel_solver(grid,
         cur_level.P = P
         cur_level.R = R
         cur_level.grid = current_grid
+
+        cur_level.presmoother = setup_presmoother(cur_level, **pre_args)
+        cur_level.postsmoother = setup_postsmoother(cur_level, **post_args)
+
         levels.append(cur_level)
 
         current_grid = current_grid.coarsen(coarse_size, P, R)
@@ -66,12 +84,14 @@ def _create_multilevel_solver(grid,
     cur_level = pyamg.multilevel.MultilevelSolver.Level()
     cur_level.A = current_grid.operator
     cur_level.grid = current_grid
+
+    cur_level.presmoother = setup_presmoother(cur_level, *pre_args)
+    cur_level.postsmoother = setup_postsmoother(cur_level, *post_args)
+
     levels.append(cur_level)
 
-    ml = pyamg.multilevel.MultilevelSolver(levels, coarse_solve)
-    change_smoothers(ml, presmoother, postsmoother)
-
-    return ml
+    # Finally, create the multilever solver itself
+    return pyamg.multilevel.MultilevelSolver(levels, coarse_solve)
 
 
 def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
@@ -129,7 +149,7 @@ def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
             return P.T
 
         # Use Gauss-Seidel point-smoothing by default
-        default_smoother = ('gauss_seidel', {'iterations': 2})
+        default_smoother = (setup_redblack_gauss_seidel, {'iterations': 2})
 
         if 'presmoother' not in kwargs:
             kwargs['presmoother'] = default_smoother
