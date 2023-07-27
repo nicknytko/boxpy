@@ -3,7 +3,7 @@ import numpy as np
 import scipy.sparse.linalg as spla
 import pyamg
 import pyamg.multilevel
-from pyamg.relaxation.smoothing import change_smoothers, _unpack_arg, _setup_call
+from pyamg.relaxation.smoothing import _unpack_arg, _setup_call
 from boxpy.interpolation import interpolate_coarsen_2
 from boxpy.smoother import setup_redblack_gauss_seidel
 
