@@ -9,13 +9,13 @@ import sys
 
 N = 64
 
-grid = boxpy.grid.create_poisson_dirichlet_2d(N, N, 1.0)
+grid, _ = boxpy.grid.create_poisson_dirichlet_2d(N, N, 1.0)
 
 if '--profile' in sys.argv:
     cProfile.runctx('ml = boxpy.boxmg_symmetric_solver(grid)',
                     globals(), locals(), sort='cumtime')
 else:
-    ml = boxpy.boxmg_symmetric_solver(grid)
+    ml = boxpy.boxmg_solver(grid)
 
 print(ml)
 

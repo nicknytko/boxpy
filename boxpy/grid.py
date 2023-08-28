@@ -13,7 +13,7 @@ class BoundaryCondition(enum.Enum):
 
 
 class Grid:
-    """Based Grid class."""
+    """Base structured grid class."""
 
     # pylint: disable-next=too-many-arguments
     def __init__(self, operator, shape, xlim, ylim, bc):
@@ -27,8 +27,24 @@ class Grid:
 
     def coarsen(self, new_shape, P, R=None):
         """Coarsen the operator."""
+        if R is None:
+            R = P.T
         AH = R @ self.operator @ P
         return Grid(AH, new_shape, self.xlim, self.ylim, self.bc)
+
+    def symmetrize(self):
+        """Symmetrizes a non-symmetric operator."""
+        A_sym = (self.operator + self.operator.T)/2
+        return Grid(A_sym, self.shape, self.xlim, self.ylim, self.bc)
+
+    def transpose(self):
+        """Transposes a non-symmetric operator."""
+        return Grid(self.operator.T, self.shape, self.xlim, self.ylim, self.bc)
+
+    @property
+    def T(self):
+        """Transposes a non-symmetric operator."""
+        return self.transpose()
 
     def __call__(self, *indices):
         """Retrieve stencils."""
@@ -63,7 +79,39 @@ class Grid:
         return f(xx, yy)
 
 
-def create_poisson_dirichlet_2d(nx, ny, nu):
+def _eval_bc(A, nx, ny, bc):
+    bc_mask = np.zeros((nx+2, ny+2), dtype=bool)
+
+    bc_mask[0] = True
+    bc_mask[-1] = True
+    bc_mask[:, 0] = True
+    bc_mask[:, -1] = True
+
+    int_mask = ~bc_mask
+
+    R = sp.eye((nx + 2) * (ny + 2)).tocsr()
+    R = R[int_mask.flatten()]
+
+    if bc is not None:
+        x = np.linspace(0, 1, nx + 2)
+        y = np.linspace(0, 1, ny + 2)
+
+        xx, yy = np.meshgrid(x, y)
+
+        bc_eval = np.zeros((nx+2, ny+2))
+        bc_eval[bc_mask] = bc(xx[bc_mask], yy[bc_mask])
+
+        I_i = sp.diags(int_mask.flatten().astype(np.int64))
+        B_i = sp.diags(bc_mask.flatten().astype(np.int64))
+
+        A_bc = I_i@A + B_i
+
+        return R@A@R.T, -R@(A_bc@bc_eval.flatten())
+    else:
+        return R@A@R.T, np.zeros((nx, ny))
+
+
+def create_poisson_dirichlet_2d(nx, ny, nu, bc=None):
     """Construct a Poisson operator in 2D.
 
     Dirichlet boundary conditions are assumed, and boundary nodes are removed
@@ -72,11 +120,14 @@ def create_poisson_dirichlet_2d(nx, ny, nu):
     Parameters
     ----------
     nx : int
-        Number of grid points in x
-    nx : int
-        Number of grid points in x
+        Number of (interior) grid points in x
+    ny : int
+        Number of (interior) grid points in y
     nu : float
-        Diffusion coefficient
+        Scalar diffusion coefficient
+    bc : function
+        Function to evaluate at the boundary conditions,
+        if None is given then homogeneous bc are assumed.
 
     Returns
     -------
@@ -85,19 +136,83 @@ def create_poisson_dirichlet_2d(nx, ny, nu):
     dx = 1./(nx + 1)
     dy = 1./(ny + 1)
 
-    Ax = (nu * (1./dx**2) * (sp.eye(nx) * 2 - sp.eye(nx, k=-1) - sp.eye(nx, k=1)))
-    Ay = (nu * (1./dy**2) * (sp.eye(ny) * 2 - sp.eye(ny, k=-1) - sp.eye(ny, k=1)))
+    Ax = (nu * (1./dx**2) * (sp.eye(nx+2) * 2 - sp.eye(nx+2, k=-1) - sp.eye(nx+2, k=1)))
+    Ay = (nu * (1./dy**2) * (sp.eye(ny+2) * 2 - sp.eye(ny+2, k=-1) - sp.eye(ny+2, k=1)))
 
-    A = sp.kron(Ax, sp.eye(ny)) + sp.kron(sp.eye(nx), Ay)
+    A = sp.kron(Ax, sp.eye(ny + 2)) + sp.kron(sp.eye(nx + 2), Ay)
 
     x = np.linspace(0, 1, nx + 2)
     y = np.linspace(0, 1, ny + 2)
+
+    A, b = _eval_bc(A, nx, ny, bc)
 
     return Grid(A,
                 shape=(nx, ny),
                 xlim=(x[1], x[-1]),
                 ylim=(y[1], y[-1]),
-                bc=BoundaryCondition.DIRICHLET)
+                bc=BoundaryCondition.DIRICHLET), b
+
+
+def create_advection_dirichlet_2d(nx, ny, nu, v, bc=None):
+    """Construct a convection-diffusion problem in 2d discretized with FDM.
+
+    Solves the problem:
+    div(nu * grad u) - div(vu) = 0
+
+    Dirichlet boundary conditions are assumed, and boundary nodes are removed
+    from the returned operator.
+
+    Parameters
+    ----------
+    nx : int
+        Number of (interior) grid points in x
+    ny : int
+        Number of (interior) grid points in x
+    nu : float
+        Scalar diffusion coefficient
+    v : function
+        Velocity function of x and y, evaluated at each grid point.
+        Should return an (N, 2) array describing the velocity field.
+    bc : function
+        Function to evaluate at the boundary conditions,
+        if None is given then homogeneous bc are assumed.
+
+    Returns
+    -------
+    Grid object
+    """
+    dx = 1./(nx + 1)
+    dy = 1./(ny + 1)
+
+    x = np.linspace(0, 1, nx + 2)
+    y = np.linspace(0, 1, ny + 2)
+    xx, yy = np.meshgrid(x, y)
+
+    # Diffusion term
+
+    Ax = (nu * (1./dx**2) * (sp.eye(nx+2) * 2 - sp.eye(nx+2, k=-1) - sp.eye(nx+2, k=1)))
+    Ay = (nu * (1./dy**2) * (sp.eye(ny+2) * 2 - sp.eye(ny+2, k=-1) - sp.eye(ny+2, k=1)))
+
+    A = sp.kron(Ax, sp.eye(ny + 2)) + sp.kron(sp.eye(nx + 2), Ay)
+
+    # Discretize advection term as div(vu) = v_x du/dx + v_y du/dy
+    # using centered differences
+
+    Cx = (2/dx) * (sp.eye(nx + 2, k=1) - sp.eye(nx + 2, k=-1))
+    Cy = (2/dy) * (sp.eye(ny + 2, k=1) - sp.eye(ny + 2, k=-1))
+
+    v_eval = v(xx.flatten(), yy.flatten())
+
+    C = ((sp.diags(v_eval[:, 1]) @ sp.kron(Cx, sp.eye(ny + 2))) +
+         (sp.diags(v_eval[:, 0]) @ sp.kron(sp.eye(nx + 2), Cy)))
+
+    A, b = _eval_bc(A + C, nx, ny, bc)
+
+    return Grid(A,
+                shape=(nx, ny),
+                xlim=(x[1], x[-1]),
+                ylim=(y[1], y[-1]),
+                bc=BoundaryCondition.DIRICHLET), b
 
 
 class Stencil:
