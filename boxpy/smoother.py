@@ -1,10 +1,11 @@
-"""Multigrid smoothers for geometric problems"""
+"""Multigrid smoothers for geometric problems."""
 import numpy as np
 import numba
 
 
 @numba.njit
 def _gauss_seidel_iter(a_data, a_indices, a_indptr, x, b, row):
+    """JIT-compiled Gauss-Seidel iteration."""
     r = 0.
     diag = 1.
 
@@ -21,7 +22,6 @@ def _gauss_seidel_iter(a_data, a_indices, a_indptr, x, b, row):
 
 def setup_redblack_gauss_seidel(level, iterations=2):
     """Create a red-black Gauss-Seidel smoother for 2D problems."""
-
     row_count = np.bincount(level.A.tocsc().indices, minlength=level.A.shape[0])
     max_degree = np.max(row_count)
 
