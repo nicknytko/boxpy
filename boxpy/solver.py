@@ -132,7 +132,7 @@ def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
     if coarsen_by not in (2, 3):
         raise RuntimeError(f'Unknown value to coarsen by: {coarsen_by}.')
 
-    # TODO: implement coarsening by 3
+    # to-be-done: implement coarsening by 3
     if coarsen_by == 3:
         raise NotImplementedError('Coarsening by 3.')
 
