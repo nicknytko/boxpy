@@ -122,7 +122,7 @@ def create_poisson_dirichlet_2d(nx, ny, nu, bc=None):
     nx : int
         Number of (interior) grid points in x
     ny : int
-        Number of (interior) grid points in x
+        Number of (interior) grid points in y
     nu : float
         Scalar diffusion coefficient
     bc : function
