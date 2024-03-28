@@ -3,6 +3,7 @@
 import enum
 import numpy as np
 import scipy.sparse as sp
+import pyamg.gallery.stencil
 
 
 class BoundaryCondition(enum.Enum):
@@ -140,6 +141,59 @@ def create_poisson_dirichlet_2d(nx, ny, nu, bc=None):
     Ay = (nu * (1./dy**2) * (sp.eye(ny+2) * 2 - sp.eye(ny+2, k=-1) - sp.eye(ny+2, k=1)))
 
     A = sp.kron(Ax, sp.eye(ny + 2)) + sp.kron(sp.eye(nx + 2), Ay)
+
+    x = np.linspace(0, 1, nx + 2)
+    y = np.linspace(0, 1, ny + 2)
+
+    A, b = _eval_bc(A, nx, ny, bc)
+
+    return Grid(A,
+                shape=(nx, ny),
+                xlim=(x[1], x[-1]),
+                ylim=(y[1], y[-1]),
+                bc=BoundaryCondition.DIRICHLET), b
+
+
+def create_diffusion_dirichlet_2d(nx, ny, D, bc=None):
+    """Construct an operator in 2D to solve the PDE
+
+    -div(D grad u) = 0
+
+    where D is a constant, symmetric positive definite diffusion coefficient.
+
+    Dirichlet boundary conditions are assumed, and boundary nodes are removed
+    from the returned operator.
+
+    Parameters
+    ----------
+    nx : int
+        Number of (interior) grid points in x
+    ny : int
+        Number of (interior) grid points in y
+    nu : numpy.ndarray
+        2 x 2 constant diffusion coefficient
+    bc : function
+        Function to evaluate at the boundary conditions,
+        if None is given then homogeneous bc are assumed.
+
+    Returns
+    -------
+    Grid object
+    """  # noqa: D400 205
+    dx = 1./(nx + 1)
+    dy = 1./(ny + 1)
+
+    idx2 = D[0, 0] / dx**2
+    idy2 = D[1, 1] / dy**2
+    idxy = (D[0, 1] + D[1, 0]) / (4*dx*dy)
+
+    stencil = np.array([
+        [idxy, -idy2, -idxy],
+        [-idx2, 2*idx2 + 2*idy2, -idx2],
+        [-idxy, -idy2, idxy]
+    ])
+
+    A = pyamg.gallery.stencil.stencil_grid(stencil, (nx + 2, ny + 2))
 
     x = np.linspace(0, 1, nx + 2)
     y = np.linspace(0, 1, ny + 2)
