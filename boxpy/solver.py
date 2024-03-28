@@ -149,12 +149,19 @@ def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
             return P.T
 
         # Use Gauss-Seidel point-smoothing by default
-        default_smoother = (setup_redblack_gauss_seidel, {'iterations': 2})
+        def_relax_pre = (setup_redblack_gauss_seidel, {
+            'iterations': 2,
+            'cycling_down': True
+        })
+        def_relax_post = (setup_redblack_gauss_seidel, {
+            'iterations': 2,
+            'cycling_down': False
+        })
 
         if 'presmoother' not in kwargs:
-            kwargs['presmoother'] = default_smoother
+            kwargs['presmoother'] = def_relax_pre
         if 'postsmoother' not in kwargs:
-            kwargs['postsmoother'] = default_smoother
+            kwargs['postsmoother'] = def_relax_post
 
         return _create_multilevel_solver(grid,
                                          **kwargs,
