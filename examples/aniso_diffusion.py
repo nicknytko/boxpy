@@ -25,7 +25,7 @@ def rhs(x, y):
     return np.sin(2*np.pi*x) * np.sin(2*np.pi*y)
 
 grid, _ = boxpy.grid.create_diffusion_dirichlet_2d(N, N, D)
-ml = boxpy.boxmg_solver(grid)
+ml = boxpy.boxmg_solver(grid, relaxation=boxpy.RelaxationType.LINE_XY)
 
 print(ml)
 

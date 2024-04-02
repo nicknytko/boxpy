@@ -1,11 +1,23 @@
 """BoxMG solver."""
+
+import enum
 import numpy as np
 import scipy.sparse.linalg as spla
 import pyamg
 import pyamg.multilevel
 from pyamg.relaxation.smoothing import _unpack_arg, _setup_call
 from boxpy.interpolation import interpolate_coarsen_2
-from boxpy.smoother import setup_redblack_gauss_seidel
+from boxpy.smoother import (setup_redblack_gauss_seidel,
+                            setup_line_relax, setup_line_relax_xy)
+
+
+class RelaxationType(enum.Enum):
+    """Enumerate relaxation types."""
+
+    POINT = 1
+    LINE_X = 2
+    LINE_Y = 3
+    LINE_XY = 4
 
 
 def _create_multilevel_solver(grid,
@@ -94,7 +106,7 @@ def _create_multilevel_solver(grid,
     return pyamg.multilevel.MultilevelSolver(levels, coarse_solve)
 
 
-def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
+def boxmg_solver(grid, symmetric=None, coarsen_by=2, relaxation=RelaxationType.POINT, **kwargs):
     """Blackbox Multigrid (BoxMG) Solver.
 
     Will detect if problem is symmetric and set-up solver accordingly.
@@ -103,6 +115,10 @@ def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
     ----------
     grid : Grid
         Fine grid object
+
+    symmetric : boolean, optional
+        Is this a symmetric problem?  If not given, will try to determine
+        symmetry automatically.
 
     coarsen_by : integer
         Number of degrees of freedom to coarsen by in each dimension.
@@ -148,15 +164,36 @@ def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
         def sym_restrict(G, P):  # pylint: disable=unused-argument
             return P.T
 
-        # Use Gauss-Seidel point-smoothing by default
-        def_relax_pre = (setup_redblack_gauss_seidel, {
-            'iterations': 2,
-            'cycling_down': True
-        })
-        def_relax_post = (setup_redblack_gauss_seidel, {
-            'iterations': 2,
-            'cycling_down': False
-        })
+        if relaxation == RelaxationType.POINT:
+            def_relax_pre = (setup_redblack_gauss_seidel, {
+                'iterations': 2,
+                'cycling_down': True
+            })
+            def_relax_post = (setup_redblack_gauss_seidel, {
+                'iterations': 2,
+                'cycling_down': False
+            })
+        elif relaxation == RelaxationType.LINE_X:
+            def_relax_pre = (setup_line_relax, {
+                'iterations': 2,
+                'direction': 'x'
+            })
+            def_relax_post = def_relax_pre
+        elif relaxation == RelaxationType.LINE_Y:
+            def_relax_pre = (setup_line_relax, {
+                'iterations': 2,
+                'direction': 'y'
+            })
+            def_relax_post = def_relax_pre
+        elif relaxation == RelaxationType.LINE_XY:
+            def_relax_pre = (setup_line_relax_xy, {
+                'iterations': 1,
+                'cycling_down': True
+            })
+            def_relax_post = (setup_line_relax_xy, {
+                'iterations': 1,
+                'cycling_down': False
+            })
 
         if 'presmoother' not in kwargs:
             kwargs['presmoother'] = def_relax_pre

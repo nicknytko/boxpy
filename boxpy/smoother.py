@@ -1,6 +1,8 @@
 """Multigrid smoothers for geometric problems."""
 import numpy as np
 import numba
+import scipy.sparse as sp
+import scipy.sparse.linalg as spla
 
 
 @numba.njit
@@ -25,7 +27,7 @@ def setup_redblack_gauss_seidel(level, iterations=2, cycling_down=True):
 
     Parameters
     ----------
-    level : integer
+    level : pyamg.multilevel.MultilevelSolver.Level
       Current level of the multigrid hierarchy
     iterations : integer
       Number of total smoothing steps to perform
@@ -82,3 +84,83 @@ def setup_redblack_gauss_seidel(level, iterations=2, cycling_down=True):
                 rb_5pt(A.data, A.indices, A.indptr, x, b, grid_dim)
 
         return solver
+
+
+def setup_line_relax(level, direction='x', iterations=2):
+    """Create a line relaxation smoother in one direction for 2D problems.
+
+    Parameters
+    ----------
+    level : pyamg.multilevel.MultilevelSolver.Level
+      Current level of the multigrid hierarchy
+    direction : string, either x or y
+      Direction to perform line smoothing in
+    iterations : integer
+      Number of total smoothing steps to perform
+    """
+    A = level.A
+    grid_x, grid_y = level.grid.shape
+
+    if direction == 'x':
+        identity_sten = sp.kron(sp.eye(grid_x) + sp.eye(grid_x, k=1) + sp.eye(grid_x, k=-1),
+                                sp.eye(grid_y))
+    else:
+        identity_sten = sp.kron(sp.eye(grid_x),
+                                sp.eye(grid_y) + sp.eye(grid_y, k=1) + sp.eye(grid_y, k=-1))
+
+    A_dir = identity_sten.multiply(A)
+    A_dir.eliminate_zeros()
+    A_off_dir = A - A_dir
+    A_off_dir.eliminate_zeros()
+
+    # print(A_dir.data)
+    # print(np.sum(abs(A_dir.data) < 1e-8))
+
+    # import matplotlib.pyplot as plt
+    # plt.figure()
+    # plt.spy(A_dir)
+    # plt.title('direction')
+    # plt.figure()
+    # plt.spy(A_off_dir)
+    # plt.title('off direction')
+    # plt.show(block=True)
+
+    A_dir_lu = spla.splu(A_dir, permc_spec='NATURAL')
+
+    def solver(A, x, b):
+        for _i in range(iterations):
+            x = A_dir_lu.solve(b - A_off_dir @ x)
+        return x
+
+    return solver
+
+
+def setup_line_relax_xy(level, iterations=1, cycling_down=True):
+    """Create a line relaxation smoother in both directions for 2D problems.
+
+    Will perform x followed by y relaxation on the down-cycle, and y followed
+    by x relaxation on the up-cycle.
+
+    Parameters
+    ---------
+    level : pyamg.multilevel.MultilevelSolver.Level
+      Current level of the multigrid hierarchy
+    iterations : integer
+      Number of total smoothing steps to perform
+    cycling_down : boolean
+      Flag to determine if this is used as a pre or post relaxation method.
+      The line relaxation ordering will be flipped for post-relaxation to
+      maintain symmetry for, e.g., preconditioning.
+    """
+
+    solver_1 = setup_line_relax(level, direction='x', iterations=iterations)
+    solver_2 = setup_line_relax(level, direction='y', iterations=iterations)
+
+    if not cycling_down:
+        # If we are cycling up, swap the order to retain symmetry
+        solver_1, solver_2 = solver_2, solver_1
+
+    def solver(A, x, b):
+        return solver_2(A, solver_1(A, x, b), b)
+
+    return solver

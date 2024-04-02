@@ -1,3 +1,3 @@
 """Main import for boxpy."""
-from boxpy.solver import boxmg_solver
-from boxpy.grid import Grid
+from boxpy.solver import boxmg_solver, RelaxationType
+from boxpy.grid import Grid, BoundaryCondition
