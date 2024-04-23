@@ -9,14 +9,15 @@ import boxpy.interpolation
 
 N = 128
 
-grid = boxpy.grid.create_poisson_dirichlet_2d(N, N, 1.0)
+grid, _ = boxpy.grid.create_poisson_dirichlet_2d(N, N, 1.0)
 
 if '--profile' in sys.argv:
     cProfile.runctx('ml = boxpy.boxmg_symmetric_solver(grid)',
                     globals(), locals(), sort='cumtime')
 else:
-    ml = boxpy.boxmg_symmetric_solver(grid)
-    print(ml)
+    ml = boxpy.boxmg_solver(grid)
+
+print(ml)
 
 x0 = grid.interp_fcn(lambda x, y: np.random.normal(size=x.shape)).flatten()
 x0 = x0 / la.norm(x0)
@@ -27,7 +28,6 @@ x = ml.solve(b, x0, residuals=res, tol=1e-13)
 res = np.array(res)
 
 m = 1
-# conv = res[1:] / res[:-1]
 conv = (res[m:]/res[:-m])**(1/m)
 
 fig = plt.figure()
