@@ -1,13 +1,13 @@
 """Solve Poisson."""
+import cProfile
+import sys
 import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
 import boxpy
 import boxpy.interpolation
-import cProfile
-import sys
 
-N = 64
+N = 128
 
 grid, _ = boxpy.grid.create_poisson_dirichlet_2d(N, N, 1.0)
 
@@ -24,10 +24,11 @@ x0 = x0 / la.norm(x0)
 b = grid.interp_fcn(lambda x, y: np.zeros_like(x)).flatten()
 
 res = []
-x = ml.solve(b, x0, residuals=res)
+x = ml.solve(b, x0, residuals=res, tol=1e-13)
 res = np.array(res)
 
-conv = res[1:] / res[:-1]
+m = 1
+conv = (res[m:]/res[:-m])**(1/m)
 
 fig = plt.figure()
 ax = plt.gca()
@@ -38,7 +39,7 @@ ax.set_xlabel('Multigrid Iteration')
 ax.set_ylabel('Absolute Residual')
 
 ax2 = ax.twinx()
-convline = ax2.plot(np.arange(1, len(res)), conv,
+convline = ax2.plot(np.arange(m, len(conv)+m), conv,
                     linestyle='--', color='tab:orange', label='Convergence')
 ax2.set_ylabel('Convergence Factor')
 
