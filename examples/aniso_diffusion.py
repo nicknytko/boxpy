@@ -10,8 +10,8 @@ import sys
 N = 64
 
 # Set up a diffusion problem with weak diffusion along the angle pi/4 radians
-theta = np.pi / 4
-epsilon = 1e-3
+theta = 0
+epsilon = 1e-2
 
 Q = np.array([
     [ np.cos(theta), np.sin(theta)],
@@ -25,7 +25,7 @@ def rhs(x, y):
     return np.sin(2*np.pi*x) * np.sin(2*np.pi*y)
 
 grid, _ = boxpy.grid.create_diffusion_dirichlet_2d(N, N, D)
-ml = boxpy.boxmg_solver(grid, relaxation=boxpy.RelaxationType.LINE_XY)
+ml = boxpy.boxmg_solver(grid, relaxation=boxpy.RelaxationType.LINE_X)
 
 print(ml)
 

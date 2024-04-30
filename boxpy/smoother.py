@@ -1,5 +1,6 @@
 """Multigrid smoothers for geometric problems."""
 import numpy as np
+import numpy.linalg as la
 import numba
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
@@ -86,7 +87,7 @@ def setup_redblack_gauss_seidel(level, iterations=2, cycling_down=True):
         return solver
 
 
-def setup_line_relax(level, direction='x', iterations=2):
+def setup_line_relax(level, direction='x', iterations=2, cycling_down=True):
     """Create a line relaxation smoother in one direction for 2D problems.
 
     Parameters
@@ -97,43 +98,57 @@ def setup_line_relax(level, direction='x', iterations=2):
       Direction to perform line smoothing in
     iterations : integer
       Number of total smoothing steps to perform
+    cycling_down : boolean
+      Flag to determine if this is used as a pre or post relaxation method.
+      The line relaxation ordering will be flipped for post-relaxation to
+      maintain symmetry for, e.g., preconditioning.
     """
     A = level.A
     grid_x, grid_y = level.grid.shape
+    grid_numel = grid_x * grid_y
 
     if direction == 'x':
-        identity_sten = sp.kron(sp.eye(grid_x) + sp.eye(grid_x, k=1) + sp.eye(grid_x, k=-1),
-                                sp.eye(grid_y))
+        R = sp.eye(grid_numel).tocsc()
+        ii = grid_x
+        jj = grid_y
     else:
-        identity_sten = sp.kron(sp.eye(grid_x),
-                                sp.eye(grid_y) + sp.eye(grid_y, k=1) + sp.eye(grid_y, k=-1))
+        reordering = np.arange(grid_numel).reshape((grid_x, grid_y)).ravel(order='F')
+        R = sp.eye(grid_numel).tocsc()[:, reordering]
+        ii = grid_y
+        jj = grid_x
 
-    A_dir = identity_sten.multiply(A)
-    A_dir.eliminate_zeros()
-    A_off_dir = A - A_dir
-    A_off_dir.eliminate_zeros()
+    # Set this up as a red-black blocked Gauss-Seidel
+    # For sweeping across lines parallel to the x-axis, we don't have to do anything
+    # special.  To sweep across lines parallel to the y-axis, we rearrange nodes so
+    # that diagonal blocks correspond to vertical lines in the grid.
 
-    # print(A_dir.data)
-    # print(np.sum(abs(A_dir.data) < 1e-8))
+    def _bsr_sweep(Ab, x, b, start):
+        for block_row in range(start, Ab.shape[0] // ii, 2):
+            D = None
+            off_diag_x = np.zeros(ii)
+            for i in range(Ab.indptr[block_row], Ab.indptr[block_row + 1]):
+                block_col = Ab.indices[i]
 
-    # import matplotlib.pyplot as plt
-    # plt.figure()
-    # plt.spy(A_dir)
-    # plt.title('direction')
-    # plt.figure()
-    # plt.spy(A_off_dir)
-    # plt.title('off direction')
-    # plt.show(block=True)
-
-    A_dir_lu = spla.splu(A_dir, permc_spec='NATURAL')
+                if block_row == block_col:
+                    D = Ab.data[i]
+                else:
+                    off_diag_x -= Ab.data[i] @ x[block_col * ii:(block_col+1) * ii]
+            x[block_row * ii : (block_row + 1) * ii] = la.solve(D, b[block_row * ii : (block_row + 1) * ii] + off_diag_x)
 
     def solver(A, x, b):
+        Ab = (R.T@A@R).tobsr((ii, jj))
+        xb = R.T@x
+        bb = R.T@b
         for _i in range(iterations):
-            x = A_dir_lu.solve(b - A_off_dir @ x)
-        return x
+            if cycling_down:
+                _bsr_sweep(Ab, xb, bb, 0)
+                _bsr_sweep(Ab, xb, bb, 1)
+            else:
+                _bsr_sweep(Ab, xb, bb, 1)
+                _bsr_sweep(Ab, xb, bb, 0)
+        x[:] = R@xb
 
     return solver
-
 
 def setup_line_relax_xy(level, iterations=1, cycling_down=True):
     """Create a line relaxation smoother in both directions for 2D problems.
@@ -153,14 +168,15 @@ def setup_line_relax_xy(level, iterations=1, cycling_down=True):
       maintain symmetry for, e.g., preconditioning.
     """
 
-    solver_1 = setup_line_relax(level, direction='x', iterations=iterations)
-    solver_2 = setup_line_relax(level, direction='y', iterations=iterations)
+    solver_1 = setup_line_relax(level, direction='x', iterations=iterations, cycling_down=cycling_down)
+    solver_2 = setup_line_relax(level, direction='y', iterations=iterations, cycling_down=cycling_down)
 
     if not cycling_down:
         # If we are cycling up, swap the order to retain symmetry
         solver_1, solver_2 = solver_2, solver_1
 
     def solver(A, x, b):
-        return solver_2(A, solver_1(A, x, b), b)
+        solver_1(A, x, b)
+        solver_2(A, x, b)
 
     return solver
