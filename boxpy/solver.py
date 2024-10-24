@@ -85,8 +85,8 @@ def _create_multilevel_solver(grid,
     cur_level.A = current_grid.operator
     cur_level.grid = current_grid
 
-    cur_level.presmoother = setup_presmoother(cur_level, *pre_args)
-    cur_level.postsmoother = setup_postsmoother(cur_level, *post_args)
+    cur_level.presmoother = setup_presmoother(cur_level, **pre_args)
+    cur_level.postsmoother = setup_postsmoother(cur_level, **post_args)
 
     levels.append(cur_level)
 
