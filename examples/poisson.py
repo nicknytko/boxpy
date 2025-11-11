@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import boxpy
 import boxpy.interpolation
 
-N = 128
+N = 16
 
 grid = boxpy.grid.create_poisson_dirichlet_2d(N, N, 1.0)
 
