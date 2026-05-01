@@ -75,7 +75,9 @@ class Grid:
         """
         xx, yy = np.meshgrid(
             np.linspace(self.xlim[0], self.xlim[1], self.shape[0]),
-            np.linspace(self.ylim[0], self.ylim[1], self.shape[1]))
+            np.linspace(self.ylim[0], self.ylim[1], self.shape[1]),
+            indexing="ij",
+        )
 
         return f(xx, yy)
 
@@ -97,7 +99,7 @@ def _eval_bc(A, nx, ny, bc):
         x = np.linspace(0, 1, nx + 2)
         y = np.linspace(0, 1, ny + 2)
 
-        xx, yy = np.meshgrid(x, y)
+        xx, yy = np.meshgrid(x, y, indexing="ij")
 
         bc_eval = np.zeros((nx+2, ny+2))
         bc_eval[bc_mask] = bc(xx[bc_mask], yy[bc_mask])
@@ -192,6 +194,10 @@ def create_diffusion_dirichlet_2d(nx, ny, D, bc=None):
         [-idx2, 2*idx2 + 2*idy2, -idx2],
         [-idxy, -idy2, idxy]
     ])
+    # Align stencil axes with (x, y) indexing="ij" convention.
+    # `stencil_grid` interprets the first stencil axis as the fast (second)
+    # grid index for our flattening; transpose so D[0,0] maps to x-couplings.
+    stencil = stencil.T
 
     A = pyamg.gallery.stencil.stencil_grid(stencil, (nx + 2, ny + 2))
 
@@ -240,7 +246,7 @@ def create_advection_dirichlet_2d(nx, ny, nu, v, bc=None):
 
     x = np.linspace(0, 1, nx + 2)
     y = np.linspace(0, 1, ny + 2)
-    xx, yy = np.meshgrid(x, y)
+    xx, yy = np.meshgrid(x, y, indexing="ij")
 
     # Diffusion term
 
@@ -257,8 +263,9 @@ def create_advection_dirichlet_2d(nx, ny, nu, v, bc=None):
 
     v_eval = v(xx.flatten(), yy.flatten())
 
-    C = ((sp.diags(v_eval[:, 1]) @ sp.kron(Cx, sp.eye(ny + 2))) +
-         (sp.diags(v_eval[:, 0]) @ sp.kron(sp.eye(nx + 2), Cy)))
+    # With indexing="ij", v(x,y) is expected to return columns (v_x, v_y).
+    C = ((sp.diags(v_eval[:, 0]) @ sp.kron(Cx, sp.eye(ny + 2))) +
+         (sp.diags(v_eval[:, 1]) @ sp.kron(sp.eye(nx + 2), Cy)))
 
     A, b = _eval_bc(A + C, nx, ny, bc)
 

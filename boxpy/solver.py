@@ -5,7 +5,69 @@ import pyamg
 import pyamg.multilevel
 from pyamg.relaxation.smoothing import _unpack_arg, _setup_call
 from boxpy.interpolation import interpolate_coarsen_2
-from boxpy.smoother import setup_redblack_gauss_seidel
+from boxpy.smoother import (
+    setup_line_relaxation_x,
+    setup_line_relaxation_y,
+    setup_redblack_gauss_seidel,
+)
+
+
+def setup_relaxation(name):
+    """Return a relaxation setup callable from a short name.
+
+    Supports a few BoxPy aliases and otherwise falls back to PyAMG's
+    relaxation setup registry.
+
+    Parameters
+    ----------
+    name : str
+        One of:
+        - 'point': BoxPy red-black point Gauss-Seidel
+        - 'line_x': BoxPy zebra x-line relaxation
+        - 'line_y': BoxPy zebra y-line relaxation
+        - any other PyAMG relaxation string
+    """
+    def _setup_line_sweep(order):
+        """Create a setup callable that composes line smoothers.
+
+        order: ('x','y') or ('y','x')
+        """
+
+        def setup(level, iterations=2, cycling_down=True, **kwargs):
+            # Allow callers to pass extra kwargs without breaking.
+            _ = kwargs
+            sx = setup_line_relaxation_x(
+                level, iterations=1, cycling_down=cycling_down
+            )
+            sy = setup_line_relaxation_y(
+                level, iterations=1, cycling_down=cycling_down
+            )
+
+            if order == ("x", "y"):
+                first, second = sx, sy
+            else:
+                first, second = sy, sx
+
+            def solver(A, x, b):
+                for _i in range(iterations):
+                    first(A, x, b)
+                    second(A, x, b)
+
+            return solver
+
+        return setup
+
+    if name == "point":
+        return setup_redblack_gauss_seidel
+    if name == "line_x":
+        return setup_line_relaxation_x
+    if name == "line_y":
+        return setup_line_relaxation_y
+    if name == "line_xy":
+        return _setup_line_sweep(("x", "y"))
+    if name == "line_yx":
+        return _setup_line_sweep(("y", "x"))
+    return _setup_call(name)
 
 
 def _create_multilevel_solver(grid,
@@ -53,12 +115,12 @@ def _create_multilevel_solver(grid,
     if callable(pre_type):
         setup_presmoother = pre_type
     else:
-        setup_presmoother = _setup_call(pre_type)
+        setup_presmoother = setup_relaxation(pre_type)
 
     if callable(post_type):
         setup_postsmoother = post_type
     else:
-        setup_postsmoother = _setup_call(post_type)
+        setup_postsmoother = setup_relaxation(post_type)
 
     # Recursively define levels in the hierarchy
     while np.all(np.array(current_grid.shape) >= min_size):
@@ -149,11 +211,11 @@ def boxmg_solver(grid, symmetric=None, coarsen_by=2, **kwargs):
             return P.T
 
         # Use Gauss-Seidel point-smoothing by default
-        def_relax_pre = (setup_redblack_gauss_seidel, {
+        def_relax_pre = ('point', {
             'iterations': 2,
             'cycling_down': True
         })
-        def_relax_post = (setup_redblack_gauss_seidel, {
+        def_relax_post = ('point', {
             'iterations': 2,
             'cycling_down': False
         })
